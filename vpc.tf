@@ -31,3 +31,39 @@ resource "aws_eip" "nat_gateway" {
   for_each   = toset(local.private_subnets)
   depends_on = [aws_internet_gateway.this]
 }
+
+# Routes
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.this.id
+}
+
+resource "aws_route" "internet_gateway" {
+  destination_cidr_block = "0.0.0.0/0"
+  route_table_id         = aws_route_table.public.id
+  gateway_id             = aws_internet_gateway.this.id
+}
+
+resource "aws_route_table_association" "public" {
+  for_each       = toset(local.public_subnets)
+  subnet_id      = aws_subnet.this[each.value].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table" "private" {
+  for_each = toset(local.private_subnets)
+  vpc_id   = aws_vpc.this.id
+}
+
+resource "aws_route" "nat_gateway" {
+  for_each               = toset(local.private_subnets)
+  destination_cidr_block = "0.0.0.0/0"
+  route_table_id         = aws_route_table.private[each.value].id
+  nat_gateway_id         = aws_nat_gateway.this[each.value].id
+}
+
+resource "aws_route_table_association" "private" {
+  for_each       = toset(local.private_subnets)
+  subnet_id      = aws_subnet.this[each.value].id
+  route_table_id = aws_route_table.private[each.value].id
+}
